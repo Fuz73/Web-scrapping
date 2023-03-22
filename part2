@@ -1,0 +1,79 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+
+# define function to extract data from product URL
+def extract_product_data(product_url):
+    # initialize empty data dictionary
+    data = {
+        "Description": "",
+        "ASIN": "",
+        "Product Description": "",
+        "Manufacturer": ""
+    }
+    # send GET request to product URL
+    try:
+        response = requests.get(product_url)
+    except requests.exceptions.RequestException as e:
+        print(f"Error: {e}")
+        return data
+    # parse HTML response using BeautifulSoup
+    soup = BeautifulSoup(response.content, "html.parser")
+    # extract product description
+    try:
+        product_desc = soup.find("div", {"id": "productDescription"}).get_text().strip()
+    except AttributeError:
+        product_desc = ""
+    data["Product Description"] = product_desc
+    # extract ASIN
+    try:
+        asin = soup.find("th", {"class": "prodDetSectionEntry"}).get_text().strip()
+    except AttributeError:
+        asin = ""
+    data["ASIN"] = asin
+    # extract manufacturer
+    try:
+        manufacturer = soup.find("a", {"id": "bylineInfo"}).get_text().strip()
+    except AttributeError:
+        manufacturer = ""
+    data["Manufacturer"] = manufacturer
+    # extract product title
+    try:
+        product_title = soup.find("span", {"id": "productTitle"}).get_text().strip()
+    except AttributeError:
+        product_title = ""
+    data["Description"] = product_title
+    return data
+
+# define function to scrape product data from search results page
+def scrape_search_results(search_url):
+    # send GET request to search URL
+    try:
+        response = requests.get(search_url)
+    except requests.exceptions.RequestException as e:
+        print(f"Error: {e}")
+        return
+    # parse HTML response using BeautifulSoup
+    soup = BeautifulSoup(response.content, "html.parser")
+    # find all product links on page
+    product_links = soup.find_all("a", {"class": "a-link-normal s-no-outline"})
+    # iterate over product links and extract data
+    for link in product_links:
+        product_url = "https://www.amazon.in" + link["href"]
+        product_data = extract_product_data(product_url)
+        # write data to CSV file
+        with open("product_data.csv", "a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=product_data.keys())
+            if f.tell() == 0:
+                writer.writeheader()
+            writer.writerow(product_data)
+
+# define main function to iterate over multiple search result pages
+def main():
+    base_url = "https://www.amazon.in/s?k=bags&crid=2M096C61O4MLT&qid=1653308124&sprefix=ba%2Caps%2C283&ref=sr_pg_{}"
+    for page_num in range(1, 21):
+        search_url = base_url.format(page_num)
+        scrape_search_results(search_url)
+
+if __name__ == "__main__":
+    main()
